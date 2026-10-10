@@ -69,8 +69,10 @@ def main():
         print(f"    detected: verse={a['verse_sec']}s ({a['verse_mode']}), "
               f"chorus={a['chorus_sec']}s ({a['chorus_mode']}), "
               f"line_period={a['line_period']}s ac={a['line_ac']}, conf={a['confidence']}")
-        if a["confidence"] < 0.35:
-            print("    ⚠️ low confidence; re-run with --verse-sec/--chorus-sec if lines drift")
+        if a["confidence"] < 0.35 or not a.get("in_nominal_band", True):
+            print("    ⚠️ 稀疏器乐 intro 类歌曲自动检测可能不准: 听一下音频, "
+                  "若歌词漂移, 用听到的开口秒数重算:")
+            print(f"       python tools/make_lrc.py {args.output} <verse秒> <chorus秒>")
         info = build_lrc_safe(args.output, a["verse_sec"], a["chorus_sec"])
     for line in info["lines"]:
         print(f"    {line}")

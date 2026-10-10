@@ -40,12 +40,11 @@ def flux_env(mag):
 def score_grid(out_dir):
     audio_sec = json.load(open(os.path.join(out_dir, "result.json"), encoding="utf-8"))["audio_seconds"]
     score = open(os.path.join(out_dir, "score.abc"), encoding="utf-8").read()
-    sections = parse_sections(score)
     bars, offsets = [], {}
-    for name in ("intro", "verse", "chorus", "outro"):
-        if name in sections:
+    for name, sbars in parse_sections(score):
+        if name not in offsets:
             offsets[name] = len(bars)
-            bars.extend(sections[name])
+        bars.extend(sbars)
     q = re.search(r"Q:1/4=(\d+)", score)
     bpm = int(q.group(1)) if q else 133
     bar_theo = (60.0 / bpm) / 8.0 * 24.0   # L:1/32, 24 units per 6/8 or 3/4 bar
@@ -58,8 +57,10 @@ def detect_anchors(out_dir):
     Abrupt attacks (vocal pickup on quiet accompaniment) show a jump >=4x from
     the previous bin; crescendo entries show a gradual rise into a sustained
     plateau. In both cases the audible attack sits ~0.2 s before the detected
-    bin start (half a bin). The line/bar period is only diagnostic: the chorus
-    entry is re-detected with the same search around a coarse prediction.
+    bin start (half a bin). The chorus entry is re-detected with the same
+    search around a coarse prediction. Caveat: a sparse intro (guqin/drums)
+    can fake a jump; an anchor outside the theoretical +-15% band therefore
+    halves the reported confidence, prompting a manual check.
     """
     bars, offsets, bar_theo, audio_sec = score_grid(out_dir)
     if "verse" not in offsets or "chorus" not in offsets:
@@ -78,7 +79,7 @@ def detect_anchors(out_dir):
     bt = np.arange(nb) * binw
 
     def find_entry(t_lo, t_hi):
-        w = (bt >= t_lo) & (bt < t_hi)
+        w = (bt >= max(0.0, t_lo)) & (bt < t_hi)
         wmax = float(cnt[w].max())
         base = float(np.median(cnt[w][cnt[w] <= np.percentile(cnt[w], 30)])) if w.any() else 0.0
         t_abrupt, t_plateau = None, None
@@ -110,11 +111,16 @@ def detect_anchors(out_dir):
             v = float(np.dot(seg[:-L], seg[L:])) / max(float(np.dot(seg, seg)), 1e-9)
             if v > best_v:
                 best_v, line_p = v, L_b
+
     conf = max(0.0, min(1.0, best_v * 1.2 + 0.35))
+    nominal = 0.85 * theo_verse <= verse_sec <= 1.12 * theo_verse
+    if not nominal:
+        conf *= 0.45  # sparse-intro regime: DSP entry is a guess, invite manual anchors
     return {"verse_sec": round(verse_sec, 2), "chorus_sec": round(chorus_sec, 2),
             "verse_mode": verse_mode, "chorus_mode": chorus_mode,
             "line_period": round(line_p, 2), "line_ac": round(best_v, 3),
-            "bar_theoretical": round(bar_theo, 4), "confidence": round(conf, 3),
+            "in_nominal_band": nominal, "bar_theoretical": round(bar_theo, 4),
+            "confidence": round(conf, 3),
             "audio_seconds": audio_sec, "total_bars": len(bars)}
 
 
