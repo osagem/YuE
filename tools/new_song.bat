@@ -81,7 +81,7 @@ echo [步骤 2/3] 开始生成: 音频 + 歌词标签 + 同步 LRC
 "%PY%" tools\generate_full.py --output "%OUTDIR%" --request "%JSON%" %ABC_ARG% %TITLE_ARG%
 echo.
 echo [步骤 3/3] 歌词对齐: 可选 ASR 逐句对齐 (约 3-10 分钟, 覆盖约七成行) 或人工两点校准
-set /p ALIGN=运行 ASR 逐句对齐? [a=运行 / 回车=跳过, 走人工校准]:
+set /p ALIGN=运行 ASR 逐句对齐? [a=运行 / 回车=跳过(继续人工两点校准, 也可一路回车全跳)]:
 if /i "%ALIGN%"=="a" goto asr_align
 set /p VSEC=若走人工: 第一句(verse)开口实测秒数 (回车=接受自动版):
 if "%VSEC%"=="" goto cal_done
